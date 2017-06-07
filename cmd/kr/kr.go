@@ -22,6 +22,9 @@ import (
 	"github.com/kryptco/kr"
 	"github.com/kryptco/kr/krdclient"
 	"github.com/urfave/cli"
+	"os/user"
+	"path"
+	"errors"
 )
 
 func PrintFatal(stderr io.ReadWriter, msg string, args ...interface{}) {
@@ -402,6 +405,54 @@ func awsCommand(c *cli.Context) (err error) {
 	return
 }
 
+const (
+	configMarker = "# DO NOT MODIFY - Added by Kryptonite"
+	configContinue = "# DONE\n"
+	configPayload = `
+Match canonical exec "kr restart"
+	IdentityAgent %d/.kr/krd-agent.sock
+	ProxyCommand krssh %h %p
+`
+)
+
+func configCommand(c *cli.Context) (err error) {
+	go func() {
+		kr.Analytics{}.PostEventUsingPersistedTrackingID("kr", "config", nil, nil)
+	}()
+	home := os.Getenv("HOME")
+	if home == "" {
+		u, err := user.Current()
+		if err != nil {
+			return err
+		}
+		home = u.HomeDir
+	}
+	configpath := path.Join(home, ".ssh", "config")
+	data, err := ioutil.ReadFile(configpath)
+	if err != nil {
+		return err
+	}
+	sdata := string(data)
+	chunks := strings.SplitN(sdata, configMarker, 2)
+	switch len(chunks) {
+	case 1:
+		// the text has never been added before
+		chunks = append(chunks, configPayload + configContinue)
+	case 2:
+		subchunks := strings.SplitN(chunks[1], configContinue, 2)
+		if len(subchunks) == 1 {
+			return errors.New("the done comment was never added to the config file")
+		}
+		subchunks[0] = configPayload
+		chunks[1] = strings.Join(subchunks, configContinue)
+	}
+	sdata = strings.Join(chunks, configMarker)
+	data = []byte(sdata)
+	err = ioutil.WriteFile(configpath, data, 0600)
+	return err
+}
+
+
 func main() {
 	app := cli.NewApp()
 	app.Name = "kr"
@@ -419,6 +470,11 @@ func main() {
 				},
 			},
 			Action: pairCommand,
+		},
+		cli.Command{
+			Name: "config",
+			Usage: "Add the necessary options to your .ssh/config file.",
+			Action: configCommand,
 		},
 		cli.Command{
 			Name:   "me",
