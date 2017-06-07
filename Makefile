@@ -4,21 +4,20 @@ OS ?= $(shell ./install/os.sh)
 
 all:
 	-mkdir -p bin
-	cd kr; go build $(GOBUILDFLAGS) -o ../bin/kr
-	cd krd/main; go build $(GOBUILDFLAGS) -o ../../bin/krd
+	cd bin; go build ../cmd/kr
+	cd bin; go build ../cmd/krd
+	cd bin; go build ../cmd/krssh
 	cd pkcs11shim; make; cp target/release/kr-pkcs11.so ../bin/
-	cd krssh; go build $(GOBUILDFLAGS) -o ../bin/krssh
 
 clean:
 	rm -rf bin/
 
-
 check:
-	go test $(GOBUILDFLAGS) github.com/kryptco/kr github.com/kryptco/kr/krd github.com/kryptco/kr/krdclient github.com/kryptco/kr/kr github.com/kryptco/kr/krssh
+	go test $(GOBUILDFLAGS) ./...
 	cd pkcs11shim; cargo test
 
 vet:
-	go vet github.com/kryptco/kr github.com/kryptco/kr/krd github.com/kryptco/kr/krdclient github.com/kryptco/kr/kr github.com/kryptco/kr/krssh
+	go vet ./...
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
@@ -54,5 +53,5 @@ uninstall:
 	$(SUDO) rm -f $(DSTBIN)/krd
 	$(SUDO) rm -f $(DSTBIN)/krssh
 	$(SUDO) rm -f $(DSTLIB)/kr-pkcs11.so
-	perl -0777 -p -i.kr.bak -e 's/\s*# Added by Kryptonite\nHost \*\n\tPKCS11Provider $(subst /,\/,$(PREFIX))\/lib\/kr-pkcs11.so\n\tProxyCommand $(subst /,\/,$(PREFIX))\/bin\/krssh %h %p\n\tIdentityFile ~\/.ssh\/id_kryptonite\n\tIdentityFile ~\/.ssh\/id_ed25519\n\tIdentityFile ~\/.ssh\/id_rsa\n\tIdentityFile ~\/.ssh\/id_ecdsa\n\tIdentityFile ~\/.ssh\/id_dsa//g' ~/.ssh/config 
+	perl -0777 -p -i.kr.bak -e 's/\s*# Added by Kryptonite\nHost \*\n\tPKCS11Provider $(subst /,\/,$(PREFIX))\/lib\/kr-pkcs11.so\n\tProxyCommand $(subst /,\/,$(PREFIX))\/bin\/krssh %h %p\n\tIdentityFile ~\/.ssh\/id_kryptonite\n\tIdentityFile ~\/.ssh\/id_ed25519\n\tIdentityFile ~\/.ssh\/id_rsa\n\tIdentityFile ~\/.ssh\/id_ecdsa\n\tIdentityFile ~\/.ssh\/id_dsa//g' ~/.ssh/config
 	kr uninstall
